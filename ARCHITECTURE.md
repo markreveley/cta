@@ -67,10 +67,26 @@ Options discussed:
    - **Finding** is handled by tag names and range blurbs.
    - **Understanding** is handled by walking back from the found atom, with the range blurb as a shortcut.
 
+## Summary hierarchy (coarse to fine)
+
+Search reads summaries from the top down and only opens finer levels where the coarser one matches:
+
+| Level | Unit | Summary | Written |
+|---|---|---|---|
+| 1 | Thread | `summary` in the front matter: 2–4 sentences covering the whole thread | When the thread is saved; rewritten if ranges change a lot |
+| 2 | Tag range | Range blurb | When the range is marked |
+| 3 | Atom | None; the verbatim text | Never changes |
+
+The thread summary lets a search drop whole threads before reading any range blurbs. That matters once there are hundreds of thread files.
+
+This mirrors **Zyphra Hierarchical Attention** (ZHA, arXiv:2610.42112), which applies the same idea inside a model. It builds a tree of compressed summaries over the KV cache, and each query descends it from coarse to fine instead of scoring every token. ZHA reports that the set of tokens a query really needs grows as a sublinear power law with context length. That is evidence for summary-first retrieval over loading whole histories. ZHA also summarizes each chunk from several learned angles ("reference queries"), so one average doesn't drown out a minority signal. Overlapping tags on a range play the same role here.
+
+ZHA does not replace this system, even if models with cheap, huge context windows arrive. Attention picks tokens implicitly and leaves no record. This system keeps explicit, curated pointers, so you can always see where context came from.
+
 ## Retrieval flow (sketch)
 
 1. A new thread starts with a request such as: "gather context on fruit-stand, then focus on X".
-2. The agent matches tag names and searches range blurbs, then collects candidate ranges from all threads.
+2. The agent matches tag names and reads thread summaries to shortlist threads, then reads range blurbs within those threads to collect candidate ranges.
 3. The agent picks the most relevant ranges and atoms (relevance filtering).
 4. For each pick it walks `prev` within that thread until the context is clear, and follows a thread-continuation link when one exists.
 5. The selections become the new thread's starting context, recorded as pointers rather than copies, so you can always trace where the context came from.

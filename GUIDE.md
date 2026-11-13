@@ -32,10 +32,15 @@ source: claude.ai chat, voice + text
 category: agent-voice-coding
 continues: null            # id of an earlier thread this one picks up from, if any
 tags: [cta-paper, thread-memory-architecture, contextual-retrieval]
+summary: >
+  Two to four sentences on the whole thread: what it was about, what was
+  decided or built, and what was left open.
 ---
 ```
 
 `tags` lists every tag name used in the file, so a search for any of them finds the file.
+
+`summary` is the top level of the search hierarchy (see `ARCHITECTURE.md`, "Summary hierarchy"). A search reads it before any range blurb to decide whether the thread is worth opening.
 
 **Body:** atoms in order, with range markers between them.
 
@@ -75,6 +80,12 @@ tags: [cta-paper, thread-memory-architecture, contextual-retrieval]
 - Keep it to 1–3 sentences (about 50–100 tokens), readable with no other context. Name the subject, what was decided or found, and how it relates to the thread's main topic.
 - Blurbs are the main search surface, so use the words someone would search for.
 
+**Thread summary**
+- Keep it to 2–4 sentences (about 60–120 words), readable with no other context.
+- Cover the main subjects, what was decided or built, and what was left open. Use the words someone would search for, as with blurbs.
+- Write it **after** the ranges and blurbs, by reading the blurbs. Don't write it from memory of the conversation.
+- If you retag a thread and the subjects change, rewrite the summary.
+
 **Tag names**
 - Use lowercase-kebab-case.
 - **Check `TAGS.md` before inventing a name.** Reuse an existing name if it fits.
@@ -94,7 +105,7 @@ tags: [cta-paper, thread-memory-architecture, contextual-retrieval]
 3. Split it into atoms (§3). Copy verbatim.
 4. Read the whole thread, then mark ranges where topics start and stop, including topics that drift away and come back (several ranges with the same tag are fine).
 5. Write a blurb for each range.
-6. Fill in the front matter, including `tags` and `continues`.
+6. Fill in the front matter, including `tags` and `continues`. Write `summary` last, from the blurbs.
 7. Check `TAGS.md`, then append any new names.
 8. Upload the file. Tell Mark the path, the number of atoms and the tags used.
 
@@ -102,18 +113,19 @@ tags: [cta-paper, thread-memory-architecture, contextual-retrieval]
 
 1. Turn X into candidate tag names using `TAGS.md`, including related or synonymous ones.
 2. Search `Agents/Threads/` for files whose text contains those names or the plain-language terms.
-3. In each hit, read the `range-start` blurbs for the matching ranges first. Don't read whole files yet.
-4. Pick the most relevant ranges. Prefer recent threads, decisions and conclusions over dead ends.
-5. **Walk back** only where needed. If a range's atoms don't make sense alone, read earlier atoms in the same file, and follow `continues` to an earlier thread if necessary. Stop when the context is clear.
-6. Produce a **context pack** for Mark to confirm:
+3. **Shortlist threads by summary.** Read each hit's front matter `summary` and drop threads that clearly aren't relevant.
+4. In each remaining thread, read the `range-start` blurbs for the matching ranges. Don't read whole files yet.
+5. Pick the most relevant ranges. Prefer recent threads, decisions and conclusions over dead ends.
+6. **Walk back** only where needed. If a range's atoms don't make sense alone, read earlier atoms in the same file, and follow `continues` to an earlier thread if necessary. Stop when the context is clear.
+7. Produce a **context pack** for Mark to confirm:
    - pointers: `file → range id → atom ids`
    - a short synthesis of what is known about X
    - open questions or conflicts between threads
-7. When the new thread is saved later, list the source threads in its first range's blurb, or set `continues` if it is a direct continuation.
+8. When the new thread is saved later, list the source threads in its first range's blurb, or set `continues` if it is a direct continuation.
 
 ### C. Retag an existing thread
 
-- You may add, move or remove **markers and blurbs**, and update the front matter `tags`.
+- You may add, move or remove **markers and blurbs**, and update the front matter `tags` and `summary`.
 - Never change atom text.
 - Drive files can't be edited in place: upload the corrected file with the same name, then trash the old one.
 
