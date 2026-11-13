@@ -26,6 +26,8 @@ Each node also shows roughly how many tokens are in its window, which makes the 
 
 - `index.html` is the whole app: one self-contained file with no build step.
 - `docs/DESIGN.md` covers the data model, prompt construction, and the open questions from the paper and how this implementation answers them.
+- `tests/smoke_test.py` drives the page with a mocked Claude runtime and checks branching, context isolation, cross-node passing and merging. Run it with `python3 tests/smoke_test.py`.
+- `AGENTS.md` explains where things live. This repo has everything, and Google Drive `Agents/cta/` keeps a copy of everything except the code.
 
 ## Status
 
