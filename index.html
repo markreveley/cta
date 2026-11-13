@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversation Tree</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<style>
+:root{
+  --bg:#f7f6f3;--panel:#fff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e3e1db;
+  --accent:#3d5afe;--accent-soft:#e8ecff;--down:#3d5afe;--up:#1b8a5a;--cross:#d9822b;--vol:#c77700;
+  --user:#eef0f6;--ctx:#f3f8f4;--danger:#c0392b;--r:12px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#151513;--panel:#1e1e1b;--ink:#ecebe6;--muted:#9a988f;--line:#33322e;
+  --accent:#8c9eff;--accent-soft:#262c4a;--down:#8c9eff;--up:#4cc38a;--cross:#f0a35e;--vol:#f0b74a;
+  --user:#272a33;--ctx:#1f2a23;--danger:#ff7b6b;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink)}
+body{display:flex;flex-direction:column;font-size:15px;line-height:1.45}
+button{font:inherit;color:inherit;cursor:pointer}
+header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+header h1{font-size:15px;margin:0 6px 0 0;font-weight:650;letter-spacing:-.01em}
+select,input[type=text],textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+select{max-width:46vw}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){.btn.primary{color:#111}}
+.btn.danger{color:var(--danger)}
+.btn:disabled{opacity:.45;cursor:default}
+.spacer{flex:1}
+.status{font-size:12px;color:var(--muted)}
+.tabs{display:none;gap:4px}
+main{flex:1;display:grid;grid-template-columns:minmax(280px,42%) 1fr;min-height:0}
+#treePane{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+#treeScroll{flex:1;overflow:auto;padding:12px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
+#chatPane{display:flex;flex-direction:column;min-height:0}
+.nodeHead{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.crumbs{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumbs a{color:inherit;text-decoration:none;cursor:pointer}
+.crumbs a:hover{text-decoration:underline}
+.titleRow{display:flex;align-items:center;gap:8px;margin-top:2px}
+.titleRow input{flex:1;font-weight:650;font-size:16px;border-color:transparent;background:transparent;padding:4px 6px;margin-left:-6px}
+.titleRow input:focus{border-color:var(--line);background:var(--bg)}
+.chip{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.vol{border-color:var(--vol);color:var(--vol)}
+.actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+#msgs{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:min(720px,100%);padding:10px 12px;border-radius:var(--r);word-wrap:break-word;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:var(--user)}
+.msg.assistant{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
+.msg.context,.inherited{align-self:stretch;background:var(--ctx);border:1px dashed var(--up);font-size:13.5px}
+.msg.context.cross{border-color:var(--cross)}
+.inherited{border-color:var(--down);background:var(--accent-soft);padding:10px 12px;border-radius:var(--r)}
+.label{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:4px}
+.msg p:first-child{margin-top:0}.msg p:last-child{margin-bottom:0}
+.msg pre{overflow:auto;background:var(--bg);padding:8px;border-radius:8px;font-size:13px}
+.msg code{font-size:13px}
+.inherited details summary{cursor:pointer;font-size:13px}
+.inherited .body{white-space:pre-wrap;margin-top:6px;max-height:260px;overflow:auto}
+.empty{color:var(--muted);text-align:center;margin:auto;max-width:380px;font-size:14px}
+.composer{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
+.composer textarea{flex:1;resize:none;min-height:42px;max-height:160px}
+svg text{font-size:12px;fill:var(--ink);pointer-events:none}
+.tnode rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.tnode{cursor:pointer}
+.tnode.active rect{stroke:var(--accent);stroke-width:2.5}
+.tnode.vol rect{stroke:var(--vol);stroke-dasharray:5 3}
+.tnode.vol.active rect{stroke-width:2.5}
+.tnode .sub{font-size:10px;fill:var(--muted)}
+/* modal */
+#modalWrap{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-end;justify-content:center;z-index:10}
+#modalWrap.open{display:flex}
+#modal{background:var(--panel);width:min(560px,100%);max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
+@media (min-width:700px){#modalWrap{align-items:center}#modal{border-radius:16px}}
+#modal h2{font-size:17px;margin:0 0 4px}
+#modal .hint{font-size:13px;color:var(--muted);margin:0 0 12px}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;cursor:pointer}
+.opt input{margin-top:3px}
+.opt b{display:block;font-weight:600}
+.opt span{font-size:13px;color:var(--muted)}
+.pick{max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px;margin:6px 0 10px}
+.pick label{display:flex;gap:8px;font-size:13px;padding:4px;align-items:flex-start}
+.mrow{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+#modal textarea{width:100%;min-height:150px}
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw;text-align:center}
+#toast.show{opacity:.92}
+@media (max-width:760px){
+  main{grid-template-columns:1fr}
+  .tabs{display:flex}
+  body[data-view=chat] #treePane{display:none}
+  body[data-view=tree] #chatPane{display:none}
+  #treePane{border-right:0}
+  header h1{display:none}
+}
+</style>
+</head>
+<body data-view="chat">
+<header>
+  <h1>Conversation Tree</h1>
+  <select id="treeSel" aria-label="Conversation tree"></select>
+  <button class="btn" id="newTree" title="New tree">+ Tree</button>
+  <button class="btn" id="treeMenu" title="Tree options">⋯</button>
+  <div class="spacer"></div>
+  <div class="tabs"><button class="btn" id="tabTree">Tree</button><button class="btn" id="tabChat">Chat</button></div>
+  <span class="status" id="status">Loading…</span>
+</header>
+<main>
+  <section id="treePane">
+    <div id="treeScroll"></div>
+    <div class="legend">
+      <span><i style="border-color:var(--down)"></i>branch (context passed down)</span>
+      <span><i style="border-color:var(--cross);border-top-style:dashed"></i>cross-node pass</span>
+      <span><b style="color:var(--up)">↑n</b> merges received</span>
+      <span><i style="border-color:var(--vol);border-top-style:dashed"></i>volatile</span>
+    </div>
+  </section>
+  <section id="chatPane">
+    <div class="nodeHead" id="nodeHead"></div>
+    <div id="msgs"></div>
+    <form class="composer" id="composer">
+      <textarea id="input" rows="1" placeholder="Message this node…"></textarea>
+      <button class="btn primary" id="send" type="submit">Send</button>
+    </form>
+  </section>
+</main>
+<div id="modalWrap"><div id="modal" role="dialog" aria-modal="true"></div></div>
+<div id="toast"></div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const tok = s => Math.ceil((s || "").length / 4);
+function md(s){
+  try { if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(s || "")); } catch(e){}
+  return "<p>" + esc(s).replace(/\n/g,"<br>") + "</p>";
+}
+let toastT;
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),3200); }
+function setStatus(m){ $("#status").textContent = m; }
+
+/* ---------------- state ---------------- */
+const S = { trees:[], tree:null, nodes:new Map(), activeId:null, busy:false, sample:null, store:null, abort:null };
+const node = id => S.nodes.get(id);
+const childrenOf = id => [...S.nodes.values()].filter(n => n.parentId === id).sort((a,b)=>a.createdAt-b.createdAt);
+function pathTo(id){ const p=[]; let n=node(id); while(n){ p.unshift(n); n=node(n.parentId); } return p; }
+function rootNode(){ return [...S.nodes.values()].find(n => !n.parentId); }
+
+/* ---------------- storage ---------------- */
+function makeQueue(){ const q=new Map(); return (key, fn) => { const p=(q.get(key)||Promise.resolve()).then(fn,fn); q.set(key,p.catch(()=>{})); return p; }; }
+const enqueue = makeQueue();
+function withTimeout(p, ms){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej({code:"timeout",message:"timed out"}),ms))]); }
+
+function dbStore(db, userId){
+  const trees = db.doc("data/users/" + userId + "/profile").collection("trees");
+  const nodesOf = tid => trees.doc(tid).collection("nodes");
+  return {
+    kind:"db",
+    async listTrees(){ const s = await withTimeout(trees.get(), 10000); return s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)); },
+    async loadNodes(tid){ const s = await withTimeout(nodesOf(tid).get(), 10000); return s.docs.map(d => JSON.parse(JSON.stringify(d.data()))); },
+    saveTree(t){ const body = JSON.parse(JSON.stringify(t)); return enqueue("t:"+t.id, () => trees.doc(t.id).set(body)); },
+    saveNode(tid, n){ const body = JSON.parse(JSON.stringify(n)); return enqueue("n:"+n.id, () => nodesOf(tid).doc(n.id).set(body)); },
+    deleteNode(tid, id){ return enqueue("n:"+id, () => nodesOf(tid).doc(id).delete()); },
+    async deleteTree(tid, ids){ for (const id of ids) await this.deleteNode(tid, id); await enqueue("t:"+tid, () => trees.doc(tid).delete()); }
+  };
+}
+function localStore(){
+  const K="cta.v1"; let mem={trees:{},nodes:{}};
+  try{ const raw=localStorage.getItem(K); if(raw) mem=JSON.parse(raw); }catch(e){}
+  const flush=()=>{ try{ localStorage.setItem(K, JSON.stringify(mem)); }catch(e){} };
+  return {
+    kind:"local",
+    async listTrees(){ return Object.values(mem.trees).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)); },
+    async loadNodes(tid){ return Object.values(mem.nodes[tid]||{}).map(n=>JSON.parse(JSON.stringify(n))); },
+    async saveTree(t){ mem.trees[t.id]=JSON.parse(JSON.stringify(t)); flush(); },
+    async saveNode(tid,n){ (mem.nodes[tid] ||= {})[n.id]=JSON.parse(JSON.stringify(n)); flush(); },
+    async deleteNode(tid,id){ if(mem.nodes[tid]) delete mem.nodes[tid][id]; flush(); },
+    async deleteTree(tid){ delete mem.trees[tid]; delete mem.nodes[tid]; flush(); }
+  };
+}
+function persistErr(e){ console.warn(e); if (e && e.code === "quota_exceeded") toast("Storage is full: delete an old tree to keep saving."); else toast("Couldn't save that change."); }
+function touchTree(){ S.tree.updatedAt = Date.now(); const t=S.trees.find(x=>x.id===S.tree.id); if(t){ Object.assign(t, S.tree); } S.store.saveTree(S.tree).catch(persistErr); }
+function saveNode(n){ S.store.saveNode(S.tree.id, n).catch(persistErr); }
+
+/* ---------------- Claude ---------------- */
+function transcript(msgs){
+  return msgs.map(m => m.role === "user" ? "User: " + m.content
+    : m.role === "assistant" ? "Claude: " + m.content
+    : "[" + (m.kind === "merge" ? "Merged from branch" : "Passed from node") + " \"" + m.from + "\"]: " + m.content).join("\n\n");
+}
+function fullContextText(n){
+  const parts=[];
+  if (n.inherited && n.inherited.text) parts.push("(Context this node started with)\n" + n.inherited.text);
+  if (n.messages.length) parts.push(transcript(n.messages));
+  return parts.join("\n\n");
+}
+function buildInput(n){
+  const pre = "You are Claude, replying inside one node of a Conversation Tree: a conversation split into context-isolated branches. " +
+    "You can see only this node's context: what it inherited from its parent (if anything), plus its own messages and any notes merged or passed into it. " +
+    "Don't refer to other branches unless their content appears here. Node: \"" + n.title + "\"" + (n.volatile ? " (a volatile, exploratory branch)" : "") + "." +
+    (n.inherited && n.inherited.text ? "\n\n<inherited_context mode=\"" + n.inherited.mode + "\">\n" + n.inherited.text + "\n</inherited_context>" : "");
+  const out=[];
+  const push=(role, content)=>{ const last=out[out.length-1]; if(last && last.role===role) last.content += "\n\n" + content; else out.push({role, content}); };
+  push("user", pre);
+  for (const m of n.messages){
+    if (m.role === "assistant") push("assistant", m.content);
+    else if (m.role === "user") push("user", m.content);
+    else push("user", "<note source=\"" + (m.kind==="merge"?"merged branch":"other node") + ": " + m.from + "\">\n" + m.content + "\n</note>");
+  }
+  return out;
+}
+async function ask(prompt, opts){
+  if (!S.sample) throw {code:"no_sample", message:"Claude isn't available on this view of the page."};
+  return S.sample(prompt, Object.assign({cache:false}, opts||{}));
+}
+function sampleErr(e){
+  console.warn(e);
+  const c = e && e.code;
+  if (c === "not_granted") toast("Claude access wasn't granted for this page.");
+  else if (c === "rate_limited") toast("Rate limited. Wait a moment and try again.");
+  else if (c === "no_sample") toast(e.message);
+  else if (c !== "aborted") toast("Claude couldn't answer: " + ((e && e.message) || "unknown error"));
+}
+
+/* ---------------- tree ops ---------------- */
+function newNode(parentId, title, opts){
+  return Object.assign({ id:uid8(), parentId, title, volatile:false, inherited:null, messages:[], merges:0, createdAt:Date.now() }, opts||{});
+}
+async function createTree(title){
+  const t = { id:uid8(), title: title || "New conversation", links:[], createdAt:Date.now(), updatedAt:Date.now() };
+  const r = newNode(null, "Root");
+  S.trees.unshift(t); S.tree = t; S.nodes = new Map([[r.id, r]]); S.activeId = r.id;
+  await S.store.saveTree(t).catch(persistErr); saveNode(r);
+  renderAll();
+}
+async function openTree(id){
+  const t = S.trees.find(x => x.id === id); if (!t) return;
+  setStatus("Loading tree…");
+  try{
+    const ns = await S.store.loadNodes(id);
+    S.tree = JSON.parse(JSON.stringify(t)); S.tree.links ||= [];
+    S.nodes = new Map(ns.map(n => [n.id, n]));
+    if (!S.nodes.size){ const r=newNode(null,"Root"); S.nodes.set(r.id,r); saveNode(r); }
+    const last = S.tree.lastActive && S.nodes.get(S.tree.lastActive);
+    S.activeId = last ? last.id : rootNode().id;
+    setStatus(S.store.kind === "db" ? "Saved" : "Saved in this browser only");
+  }catch(e){ console.warn(e); setStatus("Can't reach saved data yet"); }
+  renderAll();
+}
+function setActive(id){
+  if (!node(id)) return;
+  S.activeId = id; S.tree.lastActive = id;
+  renderAll();
+  if (window.innerWidth <= 760) setView("chat");
+}
+
+/* ---------------- render: tree ---------------- */
+const NW=140, NH=44, GX=158, GY=84, PAD=14;
+function layout(){
+  const pos=new Map(); let next=0;
+  const walk=(n,d)=>{ const ch=childrenOf(n.id);
+    if(!ch.length){ pos.set(n.id,{x:next++,y:d}); }
+    else { ch.forEach(c=>walk(c,d+1)); const a=pos.get(ch[0].id).x, b=pos.get(ch[ch.length-1].id).x; pos.set(n.id,{x:(a+b)/2,y:d}); }
+  };
+  const r=rootNode(); if(r) walk(r,0);
+  return pos;
+}
+function renderTree(){
+  const box=$("#treeScroll"); if(!S.tree){ box.innerHTML=""; return; }
+  const pos=layout(); let maxX=0,maxY=0;
+  pos.forEach(p=>{maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);});
+  const W=PAD*2+maxX*GX+NW, H=PAD*2+maxY*GY+NH;
+  const cx=p=>PAD+p.x*GX+NW/2, ty=p=>PAD+p.y*GY;
+  let edges="", cross="", nodesSvg="";
+  S.nodes.forEach(n=>{
+    const p=pos.get(n.id); if(!p) return;
+    if(n.parentId && pos.get(n.parentId)){
+      const q=pos.get(n.parentId), x1=cx(q), y1=ty(q)+NH, x2=cx(p), y2=ty(p), my=(y1+y2)/2;
+      edges+=`<path d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2-3}" fill="none" stroke="var(--down)" stroke-width="1.6" marker-end="url(#ad)"/>`;
+    }
+  });
+  (S.tree.links||[]).forEach(l=>{
+    const a=pos.get(l.from), b=pos.get(l.to); if(!a||!b) return;
+    const x1=cx(a), y1=ty(a)+NH/2, x2=cx(b), y2=ty(b)+NH/2, bend=Math.max(30, Math.abs(x2-x1)*.25);
+    cross+=`<path d="M${x1},${y1} Q${(x1+x2)/2},${Math.min(y1,y2)-bend} ${x2},${y2}" fill="none" stroke="var(--cross)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ac)" opacity=".9"/>`;
+  });
+  S.nodes.forEach(n=>{
+    const p=pos.get(n.id); if(!p) return;
+    const x=PAD+p.x*GX, y=ty(p);
+    const t=n.title.length>18?n.title.slice(0,17)+"…":n.title;
+    const sub=`${n.messages.filter(m=>m.role!=="context").length} msgs · ~${tok(fullContextText(n))} tok`;
+    nodesSvg+=`<g class="tnode${n.id===S.activeId?" active":""}${n.volatile?" vol":""}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(n.title)}">
+      <rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="10"/>
+      <text x="${x+10}" y="${y+18}">${esc(t)}</text>
+      <text class="sub" x="${x+10}" y="${y+34}">${esc(sub)}</text>
+      ${n.merges?`<text x="${x+NW-8}" y="${y+18}" text-anchor="end" style="fill:var(--up);font-weight:700;font-size:11px">↑${n.merges}</text>`:""}
+    </g>`;
+  });
+  box.innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <defs>
+      <marker id="ad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--down)"/></marker>
+      <marker id="ac" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--cross)"/></marker>
+    </defs>${edges}${cross}${nodesSvg}</svg>`;
+  box.querySelectorAll(".tnode").forEach(g=>{
+    g.addEventListener("click",()=>setActive(g.dataset.id));
+    g.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setActive(g.dataset.id);} });
+  });
+}
+
+/* ---------------- render: chat ---------------- */
+function renderHead(){
+  const h=$("#nodeHead"), n=node(S.activeId);
+  if(!n){ h.innerHTML=""; return; }
+  const crumbs=pathTo(n.id).map((p,i,a)=> i===a.length-1 ? `<span>${esc(p.title)}</span>` : `<a data-id="${p.id}">${esc(p.title)}</a>`).join(" › ");
+  const isRoot=!n.parentId, hasKids=childrenOf(n.id).length>0;
+  h.innerHTML=`<div class="crumbs">${crumbs}</div>
+    <div class="titleRow"><input id="nodeTitle" type="text" value="${esc(n.title)}" aria-label="Node title">
+      ${n.volatile?'<span class="chip vol">volatile</span>':""}
+      ${n.inherited?`<span class="chip">inherited: ${esc(n.inherited.mode)}</span>`:""}
+      <span class="chip">~${tok(fullContextText(n))} tokens in window</span></div>
+    <div class="actions">
+      <button class="btn" id="aBranch">Branch</button>
+      <button class="btn" id="aExplore" title="Temporary branch with full context">Explore (volatile)</button>
+      <button class="btn" id="aSend" ${S.nodes.size<2?"disabled":""}>Send to node…</button>
+      ${isRoot?"":`<button class="btn danger" id="aClose" ${hasKids?'disabled title="Close its child branches first"':""}>Close branch…</button>`}
+    </div>`;
+  h.querySelectorAll(".crumbs a").forEach(a=>a.onclick=()=>setActive(a.dataset.id));
+  const ti=$("#nodeTitle");
+  ti.onchange=()=>{ const v=ti.value.trim(); if(v && v!==n.title){ n.title=v; saveNode(n); renderTree(); renderHead(); } else ti.value=n.title; };
+  ti.onkeydown=e=>{ if(e.key==="Enter") ti.blur(); };
+  $("#aBranch").onclick=()=>branchDialog(false);
+  $("#aExplore").onclick=()=>branchDialog(true);
+  const s=$("#aSend"); if(s) s.onclick=sendDialog;
+  const c=$("#aClose"); if(c) c.onclick=closeDialog;
+}
+function msgHtml(m){
+  if(m.role==="context"){
+    const lab = m.kind==="merge" ? `Merged up from “${esc(m.from)}”` : `Passed from “${esc(m.from)}”`;
+    return `<div class="msg context ${m.kind==="cross"?"cross":""}"><div class="label">${lab}</div>${md(m.content)}</div>`;
+  }
+  return `<div class="msg ${m.role}" data-mid="${m.id}">${m.role==="assistant"?md(m.content):esc(m.content).replace(/\n/g,"<br>")}</div>`;
+}
+function renderMsgs(){
+  const box=$("#msgs"), n=node(S.activeId); if(!n){ box.innerHTML=""; return; }
+  let html="";
+  if(n.inherited && n.inherited.text){
+    html+=`<div class="inherited"><details><summary><b>Passed down from parent</b> · ${esc(n.inherited.mode)} · ~${tok(n.inherited.text)} tokens</summary><div class="body">${esc(n.inherited.text)}</div></details></div>`;
+  }
+  if(!n.messages.length){
+    html+=`<div class="empty">${n.parentId
+      ? (n.inherited ? "This branch starts with the context shown above, and nothing else." : "This branch starts with a clean context window. It can't see its parent.")
+      : "This is the root of the tree. Talk here, then branch off whenever a topic deserves its own clean context."}</div>`;
+  }
+  html+=n.messages.map(msgHtml).join("");
+  box.innerHTML=html; box.scrollTop=box.scrollHeight;
+}
+function renderTreeSel(){
+  const sel=$("#treeSel");
+  sel.innerHTML=S.trees.map(t=>`<option value="${t.id}" ${S.tree&&t.id===S.tree.id?"selected":""}>${esc(t.title)}</option>`).join("");
+}
+function renderAll(){ renderTreeSel(); renderTree(); renderHead(); renderMsgs(); updateComposer(); }
+function updateComposer(){ $("#send").textContent = S.busy ? "Stop" : "Send"; $("#input").disabled = !S.tree; }
+function setView(v){ document.body.dataset.view=v; }
+
+/* ---------------- sending ---------------- */
+async function send(){
+  if (S.busy){ if(S.abort) S.abort.abort(); return; }
+  const inp=$("#input"), text=inp.value.trim(); const n=node(S.activeId);
+  if(!text||!n) return;
+  if(!S.sample){ toast("Claude isn't available on this view of the page."); return; }
+  inp.value=""; autosize();
+  const firstUser = !n.messages.some(m=>m.role==="user");
+  n.messages.push({id:uid8(), role:"user", content:text, ts:Date.now()});
+  if(firstUser && /^(New branch|Explore)/.test(n.title)) n.title = text.slice(0,40) + (text.length>40?"…":"");
+  const a={id:uid8(), role:"assistant", content:"", ts:Date.now()};
+  n.messages.push(a);
+  S.busy=true; renderAll();
+  const el=$(`[data-mid="${a.id}"]`); if(el) el.innerHTML='<span class="status">Thinking…</span>';
+  S.abort=new AbortController();
+  try{
+    const res = await ask(buildInput({...n, messages:n.messages.slice(0,-1)}), {
+      signal:S.abort.signal,
+      onText:({text})=>{ a.content=text; const e=$(`[data-mid="${a.id}"]`); if(e){ e.innerHTML=md(text); const b=$("#msgs"); b.scrollTop=b.scrollHeight; } }
+    });
+    a.content = res.text || a.content;
+    if(res.truncated) a.content += "\n\n*(reply was cut off)*";
+  }catch(e){
+    if(!a.content){ n.messages.pop(); }
+    if(!(S.abort && S.abort.signal.aborted)) sampleErr(e);
+  }finally{
+    S.busy=false; S.abort=null; saveNode(n); touchTree(); renderAll();
+  }
+}
+
+/* ---------------- modal helpers ---------------- */
+function openModal(html){ $("#modal").innerHTML=html; $("#modalWrap").classList.add("open"); }
+function closeModal(){ $("#modalWrap").classList.remove("open"); $("#modal").innerHTML=""; }
+$("#modalWrap").addEventListener("click", e=>{ if(e.target.id==="modalWrap") closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+function pickList(msgs, name){
+  return `<div class="pick">${msgs.map((m,i)=>`<label><input type="checkbox" name="${name}" value="${i}" checked><span><b>${m.role==="user"?"You":m.role==="assistant"?"Claude":"Note"}:</b> ${esc(m.content.slice(0,140))}${m.content.length>140?"…":""}</span></label>`).join("")}</div>`;
+}
+
+/* Downstream passing */
+function branchDialog(volatile){
+  const p=node(S.activeId); const hasCtx = p.messages.length || (p.inherited && p.inherited.text);
+  openModal(`<h2>${volatile?"Explore in a volatile branch":"New branch"}</h2>
+    <p class="hint">Choose what the new branch can see. It sees nothing else from “${esc(p.title)}”.</p>
+    <label class="opt"><input type="radio" name="mode" value="full" ${hasCtx?"checked":""} ${hasCtx?"":"disabled"}><div><b>Full context</b><span>Copy this node's whole window (~${tok(fullContextText(p))} tokens).</span></div></label>
+    <label class="opt"><input type="radio" name="mode" value="summary" ${hasCtx?"":"disabled"}><div><b>Summary</b><span>Claude condenses this node into a short brief.</span></div></label>
+    <label class="opt"><input type="radio" name="mode" value="selected" ${p.messages.length?"":"disabled"}><div><b>Selected messages</b><span>Pick exactly what to carry over.</span></div></label>
+    <div id="selBox" style="display:none">${pickList(p.messages,"sel")}</div>
+    <label class="opt"><input type="radio" name="mode" value="none" ${hasCtx?"":"checked"}><div><b>Clean slate</b><span>Start with an empty context window.</span></div></label>
+    <label class="opt"><input type="checkbox" id="volChk" ${volatile?"checked":""}><div><b>Volatile</b><span>Temporary. When you close it, you choose: merge what it found back up, or purge it.</span></div></label>
+    <div class="mrow"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mOk">Create branch</button></div>`);
+  if (volatile && hasCtx) document.querySelector('input[value=full]').checked = true;
+  const sync=()=>{ $("#selBox").style.display = document.querySelector('input[name=mode]:checked')?.value==="selected" ? "block":"none"; };
+  document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=sync); sync();
+  $("#mCancel").onclick=closeModal;
+  $("#mOk").onclick=async()=>{
+    const mode=document.querySelector('input[name=mode]:checked')?.value||"none";
+    const vol=$("#volChk").checked;
+    let inherited=null;
+    if(mode==="full") inherited={mode:"full", text:fullContextText(p)};
+    else if(mode==="selected"){
+      const idx=[...document.querySelectorAll('input[name=sel]:checked')].map(i=>+i.value);
+      if(!idx.length){ toast("Pick at least one message, or choose Clean slate."); return; }
+      inherited={mode:"selected", text:transcript(idx.map(i=>p.messages[i]))};
+    } else if(mode==="summary"){
+      const b=$("#mOk"); b.disabled=true; b.textContent="Summarizing…";
+      try{
+        const r=await ask("Condense the conversation below into a compact context brief that a new, separate branch of the conversation will start from. Keep facts, decisions, constraints, definitions and open questions; drop chit-chat. Use short bullet points, under 200 words. Output only the brief.\n\n<conversation>\n"+fullContextText(p)+"\n</conversation>");
+        inherited={mode:"summary", text:r.text.trim()};
+      }catch(e){ sampleErr(e); b.disabled=false; b.textContent="Create branch"; return; }
+    }
+    const c=newNode(p.id, vol?"Explore":"New branch", {volatile:vol, inherited});
+    S.nodes.set(c.id,c); saveNode(c); closeModal(); touchTree(); setActive(c.id);
+    $("#input").focus();
+  };
+}
+
+/* Upstream merging + volatile close */
+function closeDialog(){
+  const n=node(S.activeId), p=node(n.parentId); if(!p) return;
+  if(childrenOf(n.id).length){ toast("Close this node's child branches first."); return; }
+  openModal(`<h2>Close “${esc(n.title)}”</h2>
+    <p class="hint">${n.volatile?"This is a volatile branch. Merge what it found into its parent, or purge it for good.":"Merge what this branch established into its parent, or delete it without merging."}</p>
+    <label class="opt"><input type="radio" name="cm" value="merge" checked><div><b>Merge up into “${esc(p.title)}”</b><span>Claude drafts a merge note. You edit it before it's added.</span></div></label>
+    <label class="opt"><input type="radio" name="cm" value="pick"><div><b>Merge selected messages</b><span>Copy specific messages up as they are.</span></div></label>
+    <div id="pickBox" style="display:none">${pickList(n.messages,"mp")}</div>
+    <label class="opt"><input type="radio" name="cm" value="purge"><div><b>${n.volatile?"Purge":"Delete without merging"}</b><span>Nothing from this branch reaches the parent.</span></div></label>
+    <div id="draftBox" style="display:none"><div class="label" style="margin-top:8px">Merge note (editable)</div><textarea id="draft"></textarea></div>
+    <div class="mrow"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mOk">Continue</button></div>`);
+  const sel=()=>document.querySelector('input[name=cm]:checked').value;
+  let drafted=false;
+  const sync=()=>{ $("#pickBox").style.display = sel()==="pick"?"block":"none"; if(!drafted){ $("#draftBox").style.display="none"; $("#mOk").textContent = sel()==="purge"?(n.volatile?"Purge branch":"Delete branch"):"Continue"; } };
+  document.querySelectorAll('input[name=cm]').forEach(r=>r.onchange=()=>{ drafted=false; sync(); });
+  sync();
+  $("#mCancel").onclick=closeModal;
+  const finish=(content)=>{
+    if(content){
+      p.messages.push({id:uid8(), role:"context", kind:"merge", from:n.title, content, ts:Date.now()});
+      p.merges=(p.merges||0)+1; saveNode(p);
+    }
+    S.nodes.delete(n.id); S.store.deleteNode(S.tree.id, n.id).catch(persistErr);
+    S.tree.links=(S.tree.links||[]).filter(l=>l.from!==n.id&&l.to!==n.id);
+    closeModal(); touchTree(); setActive(p.id);
+    toast(content?"Merged into “"+p.title+"”.":"Branch removed.");
+  };
+  $("#mOk").onclick=async()=>{
+    const m=sel();
+    if(m==="purge"){ finish(null); return; }
+    if(m==="pick"){
+      const idx=[...document.querySelectorAll('input[name=mp]:checked')].map(i=>+i.value);
+      if(!idx.length){ toast("Pick at least one message."); return; }
+      finish(transcript(idx.map(i=>n.messages[i]))); return;
+    }
+    if(!drafted){
+      if(!n.messages.length){ toast("This branch has no messages to merge."); return; }
+      const b=$("#mOk"); b.disabled=true; b.textContent="Drafting…";
+      try{
+        const r=await ask(`A side branch of a conversation, titled "${n.title}", is being closed and merged back into its parent conversation, titled "${p.title}". Write the merge note the parent should keep: conclusions, decisions, and facts worth retaining. Leave out dead ends and anything already in the context it inherited. Short bullet points, under 150 words. Output only the note.\n\n<branch>\n${transcript(n.messages)}\n</branch>`);
+        $("#draft").value=r.text.trim(); drafted=true;
+        $("#draftBox").style.display="block"; b.textContent="Merge note into parent";
+      }catch(e){ sampleErr(e); b.textContent="Continue"; }
+      b.disabled=false; return;
+    }
+    const v=$("#draft").value.trim(); if(!v){ toast("The merge note is empty."); return; }
+    finish(v);
+  };
+}
+
+/* Cross-node passing */
+function sendDialog(){
+  const n=node(S.activeId);
+  const targets=[...S.nodes.values()].filter(x=>x.id!==n.id);
+  const lastA=[...n.messages].reverse().find(m=>m.role==="assistant");
+  openModal(`<h2>Send from “${esc(n.title)}”</h2>
+    <p class="hint">Copies content into another node's context window: a sibling, parent, or any other node.</p>
+    <div class="label">To</div>
+    <select id="tgt" style="width:100%;margin-bottom:10px">${targets.map(t=>`<option value="${t.id}">${esc(pathTo(t.id).map(x=>x.title).join(" › "))}</option>`).join("")}</select>
+    <label class="opt"><input type="radio" name="sm" value="summary" checked><div><b>Summary of this node</b><span>Claude condenses it. You can edit the result.</span></div></label>
+    <label class="opt"><input type="radio" name="sm" value="last" ${lastA?"":"disabled"}><div><b>Latest Claude reply</b><span>Send the last answer as it is.</span></div></label>
+    <label class="opt"><input type="radio" name="sm" value="custom"><div><b>Write it yourself</b></div></label>
+    <div id="sBox" style="display:none"><div class="label" style="margin-top:8px">Content to send (editable)</div><textarea id="sText"></textarea></div>
+    <div class="mrow"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mOk">Continue</button></div>`);
+  let ready=false;
+  const sel=()=>document.querySelector('input[name=sm]:checked').value;
+  document.querySelectorAll('input[name=sm]').forEach(r=>r.onchange=()=>{ ready=false; $("#sBox").style.display="none"; $("#mOk").textContent="Continue"; });
+  $("#mCancel").onclick=closeModal;
+  $("#mOk").onclick=async()=>{
+    if(!ready){
+      const m=sel(), b=$("#mOk");
+      if(m==="last") $("#sText").value=lastA.content;
+      else if(m==="custom") $("#sText").value="";
+      else{
+        if(!fullContextText(n)){ toast("This node is empty."); return; }
+        b.disabled=true; b.textContent="Summarizing…";
+        try{ const r=await ask("Condense the conversation below into a short note for a different conversation thread that needs to know what was found here. Key facts and conclusions only, short bullets, under 150 words. Output only the note.\n\n<conversation>\n"+fullContextText(n)+"\n</conversation>"); $("#sText").value=r.text.trim(); }
+        catch(e){ sampleErr(e); b.disabled=false; b.textContent="Continue"; return; }
+        b.disabled=false;
+      }
+      ready=true; $("#sBox").style.display="block"; b.textContent="Send"; $("#sText").focus(); return;
+    }
+    const v=$("#sText").value.trim(); if(!v){ toast("Nothing to send."); return; }
+    const t=node($("#tgt").value); if(!t) return;
+    t.messages.push({id:uid8(), role:"context", kind:"cross", from:n.title, content:v, ts:Date.now()});
+    saveNode(t);
+    S.tree.links=(S.tree.links||[]); S.tree.links.push({from:n.id, to:t.id, ts:Date.now()});
+    closeModal(); touchTree(); renderAll(); toast("Sent to “"+t.title+"”.");
+  };
+}
+
+/* Tree menu */
+function treeMenu(){
+  if(!S.tree) return;
+  openModal(`<h2>Tree options</h2>
+    <div class="label">Name</div><input type="text" id="tName" value="${esc(S.tree.title)}" style="width:100%">
+    <div class="mrow" style="justify-content:space-between">
+      <div><button class="btn" id="tCopy">Copy as Markdown</button></div>
+      <div><button class="btn danger" id="tDel">Delete tree</button> <button class="btn primary" id="tSave">Save</button></div>
+    </div>`);
+  $("#tSave").onclick=()=>{ const v=$("#tName").value.trim(); if(v){ S.tree.title=v; touchTree(); } closeModal(); renderTreeSel(); };
+  $("#tCopy").onclick=async()=>{
+    const lines=["# "+S.tree.title,""];
+    const walk=(n,d)=>{ lines.push("#".repeat(Math.min(d+2,6))+" "+n.title+(n.volatile?" (volatile)":""),"");
+      if(n.inherited&&n.inherited.text) lines.push("> Inherited ("+n.inherited.mode+"):","> "+n.inherited.text.replace(/\n/g,"\n> "),"");
+      n.messages.forEach(m=>lines.push("**"+(m.role==="user"?"You":m.role==="assistant"?"Claude":(m.kind==="merge"?"Merged from "+m.from:"Passed from "+m.from))+":** "+m.content,""));
+      childrenOf(n.id).forEach(c=>walk(c,d+1)); };
+    walk(rootNode(),0);
+    try{ await navigator.clipboard.writeText(lines.join("\n")); toast("Copied the tree as Markdown."); }catch(e){ toast("Couldn't copy here."); }
+  };
+  $("#tDel").onclick=()=>{
+    const b=$("#tDel"); if(b.dataset.c!=="1"){ b.dataset.c="1"; b.textContent="Tap again to delete"; return; }
+    const id=S.tree.id, ids=[...S.nodes.keys()];
+    S.store.deleteTree(id, ids).catch(persistErr);
+    S.trees=S.trees.filter(t=>t.id!==id); closeModal();
+    if(S.trees.length) openTree(S.trees[0].id); else createTree();
+  };
+}
+
+/* ---------------- wiring ---------------- */
+function autosize(){ const t=$("#input"); t.style.height="auto"; t.style.height=Math.min(t.scrollHeight,160)+"px"; }
+$("#input").addEventListener("input", autosize);
+$("#input").addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey && window.innerWidth>760){ e.preventDefault(); send(); } });
+$("#composer").addEventListener("submit", e=>{ e.preventDefault(); send(); });
+$("#newTree").onclick=()=>createTree();
+$("#treeMenu").onclick=treeMenu;
+$("#treeSel").onchange=e=>openTree(e.target.value);
+$("#tabTree").onclick=()=>setView("tree");
+$("#tabChat").onclick=()=>setView("chat");
+
+/* ---------------- boot ---------------- */
+async function boot(){
+  const use = n => (window.claude && window.claude.use) ? window.claude.use(n).catch(()=>null) : Promise.resolve(null);
+  const [db, user, sample] = await Promise.all([use("db"), use("user"), use("sample")]);
+  S.sample = sample;
+  let userId=null; try{ userId = user ? await user.id() : null; }catch(e){}
+  S.store = (db && userId) ? dbStore(db, userId) : localStore();
+  try{ S.trees = await S.store.listTrees(); }
+  catch(e){ console.warn(e); setStatus("Can't reach saved data yet"); S.trees=[]; }
+  if(S.trees.length) await openTree(S.trees[0].id); else await createTree("My first tree");
+  setStatus(S.store.kind==="db" ? "Saved" : "Saved in this browser only");
+  if(!S.sample) toast("Claude isn't available on this view, so you can browse trees but not send messages.");
+}
+boot();
+})();
+</script>
+</body>
+</html>
