@@ -1,34 +1,25 @@
-# CTA: Conversation Tree Architecture, inside Claude
+# CTA (working name): thread-based memory
 
-This app implements *Conversation Tree Architecture: A Structured Framework for Context-Aware Multi-Branch LLM Conversations* (Hemanth & Saha, arXiv:2603.21278). It runs as a Claude artifact.
+**What this project is:** a system where every conversation is saved as an immutable **thread**, split into **atoms** (single exchanges), with overlapping **tag ranges** laid over it. Tags connect subjects across threads, so an agent can gather the right context to start a new thread ("find everything about X") and trace any past exchange back to exactly the context it had.
 
-A normal chat is one append-only context window, so topics bleed into each other. The paper calls this *logical context poisoning*. CTA instead organizes a conversation as a **tree of context-isolated nodes**. Each node answers from its own window, and information moves between nodes only through explicit operations.
+The name "CTA" comes from the paper that started this: *Conversation Tree Architecture* (arXiv:2603.21278). **We are not implementing CTA.** Its tree model files content by where you were standing rather than by what you discussed, so drifting topics end up orphaned in the wrong branch. This system replaces branching with tagging. See `ARCHITECTURE.md` for the reasoning.
 
-## What it does
+## Read in this order
 
-| Paper concept | In the app |
-|---|---|
-| Context-isolated node | Each node sends Claude only its own window: what it inherited, its own messages, and any notes merged or passed into it. |
-| Downstream passing | **Branch** lets you start a child with one of four contexts: *Full context*, *Summary* (Claude condenses the parent), *Selected messages*, or *Clean slate*. |
-| Upstream merging | **Close branch → Merge up** has Claude draft a merge note. You edit it, and it's appended to the parent as a marked note. You can also merge selected messages verbatim. |
-| Cross-node passing | **Send to node…** copies a summary, the latest reply, or your own text into any other node, such as a sibling. It's drawn as a dashed orange edge. |
-| Volatile nodes | **Explore (volatile)** creates a temporary branch. Closing it forces a choice: merge or purge. |
-| Tree visualization | A tappable SVG tree shows branch edges, cross-node edges, ↑n merge badges, volatile outlines, and an approximate token count per node. |
+1. `README.md`: this file.
+2. `ARCHITECTURE.md`: the model (threads, atoms, tag ranges, links, blurbs, retrieval) and its open questions.
+3. `GUIDE.md`: the operating manual: file format, tag rules, and the procedures for saving threads and gathering context. **An agent doing the work follows this.**
+4. `AGENTS.md`: where things live (repo vs. Drive) and the current sync status.
 
-Each node also shows roughly how many tokens are in its window, which makes the paper's token-efficiency argument visible.
+## Where the data lives
 
-## Running it
+- Saved threads: Google Drive `Agents/Threads/`, organized as described in `GUIDE.md`.
+- Tag registry: `Agents/Threads/TAGS.md`.
 
-- **As a Claude artifact (intended).** Publish `index.html` as an artifact and declare the capabilities `sample` (calls Claude), `db` and `user` (stores each person's trees privately under `data/users/<id>/`). It works in the Claude web, desktop and mobile apps.
-- **Standalone.** Opening `index.html` directly in a browser renders the UI and keeps trees in `localStorage`. Sending messages needs the Claude runtime, which is absent there, and the page says so.
+## Set aside
 
-## Files
-
-- `index.html` is the whole app: one self-contained file with no build step.
-- `docs/DESIGN.md` covers the data model, prompt construction, and the open questions from the paper and how this implementation answers them.
-- `tests/smoke_test.py` drives the page with a mocked Claude runtime and checks branching, context isolation, cross-node passing and merging. Run it with `python3 tests/smoke_test.py`.
-- `AGENTS.md` explains where things live. This repo has everything, and Google Drive `Agents/cta/` keeps a copy of everything except the code.
+- `examples/cta-poc/` holds the docs for a working prototype of the original CTA paper: a Claude artifact app with tree view, branching and merging. It is kept **for reference only** and is not being developed further.
 
 ## Status
 
-This is a working prototype. As with the paper, nothing has been evaluated empirically. Ideas for evaluation are in `docs/DESIGN.md`.
+Design stage. The architecture is drafted, the operating guide is written, and the first thread is saved as a worked example: `Agents/Threads/cta/2026-11-13_cta-to-thread-memory.md` (28 atoms, 12 tag ranges). Nothing is automated yet: an agent saves and retrieves threads when asked.

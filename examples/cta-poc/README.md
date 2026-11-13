@@ -1,0 +1,40 @@
+# CTA: Conversation Tree Architecture, inside Claude
+
+> **Reference only.** This is a working prototype of the original CTA paper, kept as an example. The project now builds a thread-and-tag memory system instead; see `../../README.md` and `../../ARCHITECTURE.md`. Don't extend this app.
+
+This app implements *Conversation Tree Architecture: A Structured Framework for Context-Aware Multi-Branch LLM Conversations* (Hemanth & Saha, arXiv:2603.21278). It runs as a Claude artifact.
+
+A normal chat is one append-only context window, so topics bleed into each other. The paper calls this *logical context poisoning*. CTA instead organizes a conversation as a **tree of context-isolated nodes**. Each node answers from its own window, and information moves between nodes only through explicit operations.
+
+## What it does
+
+| Paper concept | In the app |
+|---|---|
+| Context-isolated node | Each node sends Claude only its own window: what it inherited, its own messages, and any notes merged or passed into it. |
+| Downstream passing | **Branch** lets you start a child with one of four contexts: *Full context*, *Summary* (Claude condenses the parent), *Selected messages*, or *Clean slate*. |
+| Upstream merging | **Close branch → Merge up** has Claude draft a merge note. You edit it, and it's appended to the parent as a marked note. You can also merge selected messages verbatim. |
+| Cross-node passing | **Send to node…** copies a summary, the latest reply, or your own text into any other node, such as a sibling. It's drawn as a dashed orange edge. |
+| Volatile nodes | **Explore (volatile)** creates a temporary branch. Closing it forces a choice: merge or purge. |
+| Tree visualization | A tappable SVG tree shows branch edges, cross-node edges, ↑n merge badges, volatile outlines, and an approximate token count per node. |
+
+Each node also shows roughly how many tokens are in its window, which makes the paper's token-efficiency argument visible.
+
+## Running it
+
+- **As a Claude artifact (intended).** Publish `index.html` as an artifact and declare the capabilities `sample` (calls Claude), `db` and `user` (stores each person's trees privately under `data/users/<id>/`). It works in the Claude web, desktop and mobile apps.
+- **Standalone.** Opening `index.html` directly in a browser renders the UI and keeps trees in `localStorage`. Sending messages needs the Claude runtime, which is absent there, and the page says so.
+
+## Files
+
+- `index.html` is the whole app: one self-contained file with no build step.
+- `docs/DESIGN.md` covers the data model, prompt construction, and the open questions from the paper and how this implementation answers them.
+- `tests/smoke_test.py` drives the page with a mocked Claude runtime and checks branching, context isolation, cross-node passing and merging. Run it with `python3 tests/smoke_test.py`.
+- For where things live (repo vs. Drive), see the project's root `AGENTS.md`.
+
+## Status
+
+This is a working prototype. As with the paper, nothing has been evaluated empirically. Ideas for evaluation are in `docs/DESIGN.md`.
+
+## Recorded idea (not implemented)
+
+**Topic-focused branch summaries.** Today the *Summary* option condenses the whole parent. A better version would ask what the new branch is for (for example, "branching into the fruit stand") and summarize only what's relevant to that topic. This idea is recorded here and deliberately not built, because the prototype is frozen.

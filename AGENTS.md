@@ -1,31 +1,21 @@
-# Working on this repo
+# Working on this project
 
-Read this before changing anything in CTA, whether you're a person or an agent.
+Read `README.md`, then `ARCHITECTURE.md`, then `GUIDE.md`, before you do anything.
 
 ## Where things live
 
 | Place | Holds | Role |
 |---|---|---|
-| GitHub: `markreveley/cta` | **Everything**: code, tests and docs | Source of truth |
-| Google Drive: `Agents/cta/` | **Everything except code**: all docs, in the same folders as the repo | Cached copy for reading and planning |
-| Claude artifact "Conversation Tree" | The published `index.html` | Running app |
+| GitHub `markreveley/cta` | **Everything**: docs, plus any code and tests | Source of truth for the project itself |
+| Google Drive `Agents/cta/` | **Everything except code** (same paths as the repo) | Cached copy for reading and planning |
+| Google Drive `Agents/Threads/` | Saved conversation threads, in category folders, plus `TAGS.md` | The system's data. **Drive only, not in the repo.** |
 
-The code (`index.html`, `tests/`) is an implementation detail. The Drive copy describes *what* CTA is and *why*, but not how it's coded.
+Code is an implementation detail. The Drive copy describes what the system is and how to operate it, but not how it's coded.
 
 ## Rules
 
-1. **Change the repo first.** Then refresh the Drive copy of any non-code file you touched, using the same path relative to `Agents/cta/`.
-2. **Don't put code in Drive.** That means `.html`, `.js`, `.py` and other source files. Markdown and other docs go there.
-3. **Never edit the Drive copy on its own.** If you find a newer version in Drive, copy it back into the repo first.
-4. **Republish the artifact** after `index.html` changes. It needs the capabilities `sample`, `db` and `user`.
-5. **Run the smoke test** before publishing: `python3 tests/smoke_test.py`.
-
-## Layout
-
-```
-README.md          overview and paper mapping        (Drive copy)
-AGENTS.md          this file                         (Drive copy)
-docs/DESIGN.md     data model, prompts, open issues  (Drive copy)
-index.html         the whole app                     (repo only)
-tests/smoke_test.py  UI flow and isolation checks    (repo only)
-```
+1. Project docs change in the **repo first**. Then refresh the Drive copy at the same path.
+2. No code (`.html`, `.js`, `.py` and so on) in `Agents/cta/`.
+3. Never edit the Drive copy on its own. If Drive is newer, copy it back into the repo first.
+4. Threads follow `GUIDE.md` exactly. Check `Agents/Threads/TAGS.md` before using any tag.
+5. The CTA prototype (`examples/cta-poc/`) is reference only. Don't extend it.
