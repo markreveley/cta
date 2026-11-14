@@ -97,6 +97,36 @@ ZHA does not replace this system, even if models with cheap, huge context window
 - CTA's downstream pass becomes "start a thread from selected ranges". Its upstream merge becomes "tag and blurb the range".
 - The existing CTA artifact (repo `markreveley/cta`) stays as a working prototype of the tree view.
 
+## Related work: UniiChat
+
+[UniiChat](https://github.com/VictorTaelin/uniichat) (Victor Taelin / Higher Order Company, Apache-2.0, last commit 2026-10-19) is the closest existing system. It's an agent with **one chat that never ends**.
+
+- **Structure.** Every message is logged unchanged, as append-only JSON lines. A cheaper "compactor" model summarizes each message into one line, then merges adjacent lines in pairs into a **binary tree**.
+- **View.** Each call sees the whole chat in up to 128 KB. Recent messages get one line each, and older stretches are covered by fewer, broader nodes. Detail fades with age, but nothing is deleted.
+- **Zoom.** The agent opens any node into its two children, down to the original message. Its prompt makes zoom the *only* allowed way to navigate memory: no searching.
+- **Practicalities.** The tree builds in the background, and the view changes only at its end, so most input is served from the prompt cache. It also imports past Claude and ChatGPT chats.
+- **Caveat.** The README says the code is vibe-coded: written and reviewed by AI agents, so expect bugs. Treat it as a reference design.
+
+**Where it matches this design:** an immutable raw log (our atoms), coarse-to-fine summaries with drill-down to the original text (our blurbs and walk-back), and summaries written once and kept.
+
+**Where it's stronger:**
+- It manages the **live** context window automatically. That's our gap: a thread here is one flat window, and saving is manual.
+- It runs: real code with tools, subagents, prompt caching and imports.
+
+**Where this design is stronger:**
+- **Topical recall.** UniiChat merges by position, so a topic that returns months later is reachable only by zooming down from summaries that may have dropped it. Tags here find a topic at any age, in one lookup.
+- **Overlapping topics.** A pair merge can straddle a topic change, and one summary line can't hold two topics fairly. Overlapping ranges can.
+- **Curation and provenance.** Here, what gets pulled in is visible and editable, rather than fading on a fixed schedule.
+- **Cost.** One blurb per range, against roughly 2N summary calls for N messages.
+
+| | UniiChat | This design |
+|---|---|---|
+| Unit of history | One endless chat | Many threads |
+| Hierarchy built by | Position (adjacent pairs) | Topic (tag ranges at topic shifts) |
+| Finding old material | Zoom down from the top only | Tag lookup, then blurbs, then walk-back |
+| Live window | Managed automatically | Not managed (open question) |
+| Writing summaries | Every message and merge, automatic | Range blurbs and thread summary, at save |
+
 ## Open questions
 
 - Who writes tags: the user, the agent as it goes, or the agent in a pass afterwards?
@@ -104,3 +134,7 @@ ZHA does not replace this system, even if models with cheap, huge context window
 - How does the agent decide it has walked back far enough?
 - Where are things stored (threads, atoms, ranges, blurbs), and how are they indexed (keyword, embeddings, both)?
 - How does this relate to Elixir Mind and the earlier `thread-based-dag` and `personal-DAG` work?
+- **Should we combine with UniiChat's approach?** The idea is to use a UniiChat-style positional binary tree *inside* each thread, to run the live context window and to produce the thread summary (the tree's root). Tags would work *across* threads, as a topical index into atoms. Time is handled by the tree and subject by the tags. Still to work out:
+  - Do tree nodes and tag ranges need to line up, for example a range starting a new subtree?
+  - Is per-message summarization worth its cost when range blurbs already exist?
+  - With one endless chat, is a "thread" still a useful boundary, or do ranges become the only unit? Ranges are closed at thread ends today.
